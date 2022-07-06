@@ -1,4 +1,8 @@
 from rest_framework import generics 
+from rest_framework.decorators import api_view
+from rest_framework.response import Response
+#
+from django.shortcuts import get_object_or_404
 
 from .models import Product
 from .serializers import ProductSerializer
@@ -26,14 +30,69 @@ class ProductDetailAPIView(generics.RetrieveAPIView):
 product_detail_view = ProductDetailAPIView.as_view()
 ####################################################
 
-class ProductListAPIView(generics.RetrieveAPIView):
-    '''''
-    Not going to use 
-    '''''
+class ProductUpdateAPIView(generics.UpdateAPIView):
     queryset = Product.objects.all()
     serializer_class = ProductSerializer
-    # lookup_field = 'pk'
+    lookup_field = 'pk' 
 
-# This is extra code
-product_list_view = ProductListAPIView.as_view()
+    def perform_update(self, serializer):
+        instance = serializer.save()
+        if not instance.content:
+            instance.content = instance.title 
+            ## 
+product_update_view = ProductUpdateAPIView.as_view()
 ####################################################
+
+class ProductDestroyAPIView(generics.DestroyAPIView):
+    queryset = Product.objects.all()
+    serializer_class = ProductSerializer
+    lookup_field = 'pk' 
+
+    def perform_destroy(self, instance):
+        # instance
+        super().perform_destroy(instance)
+
+product_destroy_view = ProductDestroyAPIView.as_view()
+####################################################
+
+# class ProductListAPIView(generics.RetrieveAPIView):
+#     '''''
+#     Not going to use 
+#     '''''
+#     queryset = Product.objects.all()
+#     serializer_class = ProductSerializer
+#     # lookup_field = 'pk'
+
+# # This is extra code
+# product_list_view = ProductListAPIView.as_view()
+# ####################################################
+
+@api_view(["GET", "POST"])
+def product_alt_view(request, pk=None, *args, **kwargs):
+    method = request.method
+
+
+    if method == "GET":
+        if pk is not None:
+            # detail view
+            obj = get_object_or_404(Product, pk=pk)
+            data = ProductSerializer(obj, many=False).data
+            return Response(data)
+        # list view
+        pass 
+        queryset = Product.objects.all()
+        data = ProductSerializer(queryset, many=True).data
+        return Response(data)
+
+
+    if method == "POST":
+        # create an item
+        serializer = ProductSerializer(data=request.data)    
+        if serializer.is_valid(raise_exception=True):
+                title = serializer.validated_data.get('title')
+                content = serializer.validated_data.get('content') or None
+                if content is None:
+                    content = title 
+                serializer.save(content=content)
+                return Response(serializer.data)
+        return Response({"Invalid": "not good data"}, status=400),
